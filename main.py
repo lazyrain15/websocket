@@ -1,22 +1,24 @@
+import os
+import signal
 import asyncio
 import websockets
 
-connected = set()
+async def echo(websocket):
+    async for message in websocket:
+        await websocket.send(message)
 
-async def server(websocket, path):
-    # Register.
-    connected.add(websocket)
-    try:
-        async for message in websocket:
-            for conn in connected:
-                if conn != websocket:
-                    await conn.send(f'Got a new MSG FOR YOU: {message}')
-    finally:
-        # Unregister.
-        connected.remove(websocket)
-    
+# async def main():
+#     async with websockets.serve(echo, "localhost", 8765):
+#         await asyncio.Future()  # run forever
 
-start_server = websockets.serve(server, "", 8765)
+async def main():
+    # Set the stop condition when receiving SIGTERM.
+    loop = asyncio.get_running_loop()
+    stop = loop.create_future()
+    loop.add_signal_handler(signal.SIGTERM, stop.set_result, None)
 
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_forever()
+    port = int(os.environ.get("PORT", "8001"))
+    async with websockets.serve(echo, "", port):
+        await stop
+
+asyncio.run(main())
